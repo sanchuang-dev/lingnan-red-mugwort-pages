@@ -44,9 +44,12 @@ jobs:
           for name in ("app.css", "app.js"):
               assert (source/name).is_file() and (source/name).stat().st_size > 100
               assert f'./{name}' in html
-          for screen in ("home","culture","shop","bespoke","partners"):
+          for screen in ("home","culture","shop","bespoke","partners","account","trial"):
               assert f'data-page="{screen}"' in html, screen
-          print("Lingnan source routes and assets verified")
+          assert 'class="gift-channel" data-go="trial"' in html, "samples must remain nested in gifts"
+          assert 'class="tab" data-go="culture"' in html, "culture tab must remain"
+          assert 'class="tab" data-go="shop"' in html, "gift tab must remain"
+          print("Seven screens, preserved primary navigation and nested trial verified")
           PY
 
       - name: Prepare isolated Pages artifact
