@@ -1,0 +1,78 @@
+name: Publish Lingnan Demo to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+  schedule:
+    # Resync the independent source branch without storing cross-repository tokens.
+    - cron: "17 */2 * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout canonical Lingnan prototype source
+        uses: actions/checkout@v4
+        with:
+          repository: sanchuang-dev/base-prototype
+          ref: feat/lingnan-red-mugwort-prototype
+          path: prototype
+          persist-credentials: false
+
+      - name: Verify standalone HTML prototype
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check prototype/app.js
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("prototype")
+          html=(source/"index.html").read_text(encoding="utf-8")
+          for name in ("app.css", "app.js"):
+              assert (source/name).is_file() and (source/name).stat().st_size > 100
+              assert f'./{name}' in html
+          for screen in ("home","culture","shop","bespoke","partners"):
+              assert f'data-page="{screen}"' in html, screen
+          print("Lingnan source routes and assets verified")
+          PY
+
+      - name: Prepare isolated Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp prototype/index.html prototype/app.css prototype/app.js _site/
+          touch _site/.nojekyll
+          git -C prototype rev-parse HEAD > _site/source-revision.txt
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
